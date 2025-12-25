@@ -17,10 +17,10 @@ var hub = NewHub()
 func init() {
 	go hub.Run()
 }
-
 func HandleWebSocket(c *gin.Context) {
 	matchID, _ := strconv.Atoi(c.Param("match_id"))
-	userID, _ := strconv.Atoi(c.Query("user_id"))
+	uid, _ := strconv.Atoi(c.Query("user_id"))
+	userID := uint16(uid)
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -33,6 +33,20 @@ func HandleWebSocket(c *gin.Context) {
 	go client.ReadPump()
 	go client.WritePump()
 
-	joinMsg := []byte(`{"event":"player_joined","user_id":` + strconv.Itoa(userID) + `}`)
-	hub.Broadcast <- Message{MatchID: matchID, Data: joinMsg}
+	// gửi event Player Join
+	joinPacket := EncodePlayerJoin(userID)
+	hub.Broadcast <- Message{
+		MatchID: matchID,
+		Data:    joinPacket,
+	}
+
+	// GỬI VỊ TRÍ BAN ĐẦU CHO CHÍNH NGƯỜI CHƠI (FIX MẤT NHÂN VẬT)
+	startMove := EncodeMove(userID, 300, 300)
+	client.Send <- startMove // ← FIX CHÍNH
+
+	// rồi mới gửi cho người khác
+	hub.Broadcast <- Message{
+		MatchID: matchID,
+		Data:    startMove,
+	}
 }
