@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"net/http"
 
 	"traingolang/internal/auth"
@@ -140,28 +139,13 @@ func Profile(c *gin.Context) {
 
 	// 2. Query DB
 	userRepo := repository.NewUserRepository(config.DB)
-	// user, err := userRepo.FindByID(userID)
-	// if err != nil {
-	// 	c.JSON(http.StatusNotFound, gin.H{
-	// 		"error": "user not found",
-	// 	})
-	// 	return
-	// }
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "user not found",
-			})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(), // tạm thời để debug
-			})
-		}
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "user not found",
+		})
 		return
 	}
-
-	// 3. Response
 	c.JSON(http.StatusOK, gin.H{
 		"username": user.Username,
 		"avatar":   user.Avatar,
