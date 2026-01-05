@@ -20,6 +20,10 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/user/register", handler.Register)
 	r.POST("/api/user/login", handler.Login)
 	r.POST("/api/search/post", handler.SearchPostsHandler(postRepo))
+	r.GET(
+		"/api/posts/options",
+		handler.GetPostOptionsHandler(postRepo),
+	)
 	// PROTECTED ROUTES
 	api := r.Group("/api")
 	api.Use(auth.Middleware())

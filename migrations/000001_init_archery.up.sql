@@ -8,43 +8,43 @@ create table users (
    coin       integer default 0,
    created_at timestamptz default now()
 );
-CREATE TABLE images (
-  id BIGSERIAL PRIMARY KEY,
-
-  image_url TEXT NOT NULL,
-  blur_url TEXT,
-  tiny_blur_url TEXT,
-
-  public_id TEXT NOT NULL,
-
-  image_type TEXT NOT NULL,
-  owner_id INTEGER,
-
-  created_at TIMESTAMPTZ DEFAULT now(),
-
-  CONSTRAINT fk_images_user
-    FOREIGN KEY (owner_id)
-    REFERENCES users(id)
-    ON DELETE CASCADE
+create table images (
+   id            bigserial primary key,
+   image_url     text not null,
+   blur_url      text,
+   tiny_blur_url text,
+   public_id     text not null,
+   image_type    text not null,
+   owner_id      integer,
+   created_at    timestamptz default now(),
+   constraint fk_images_user foreign key ( owner_id )
+      references users ( id )
+         on delete cascade
 );
-CREATE TABLE posts (
-    id BIGSERIAL PRIMARY KEY,
-
-    image_id BIGINT REFERENCES images(id) ON DELETE SET NULL,
-
-    name VARCHAR(255) NOT NULL,
-    description VARCHAR(255),
-    topic VARCHAR(100) NOT NULL,
-    prompt TEXT,
-    hot_level SMALLINT DEFAULT 0 CHECK (hot_level BETWEEN 0 AND 9),
-    hot_at TIMESTAMPTZ,
-
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+create table posts (
+   id          bigserial primary key,
+   image_id    bigint
+      references images ( id )
+         on delete set null,
+   name        varchar(255) not null,
+   description varchar(255),
+   topic       varchar(100) not null unique,
+   prompt      text,
+   hot_level   smallint default 0 check ( hot_level between 0 and 9 ),
+   hot_at      timestamptz,
+   created_at  timestamptz default now(),
+   updated_at  timestamptz default now()
 );
 
-CREATE INDEX idx_posts_topic_created
-ON posts (topic, created_at DESC);
+create index idx_posts_topic_created on
+   posts (
+      topic,
+      created_at
+   desc );
 
-CREATE INDEX idx_posts_hot
-ON posts (hot_level DESC, hot_at DESC);
+create index idx_posts_hot on
+   posts (
+      hot_level
+   desc,
+      hot_at
+   desc );

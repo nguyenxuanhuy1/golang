@@ -10,6 +10,7 @@ import (
 	"traingolang/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 type PostRequest struct {
@@ -21,9 +22,14 @@ type PostRequest struct {
 }
 type SearchPostRequest struct {
 	Name     string `json:"name"`
+	Topic    string `json:"topic"`
 	HotLevel *int8  `json:"hotLevel"`
 	Page     int    `json:"page"`
 	PageSize int    `json:"pageSize"`
+}
+type PostOption struct {
+	Value int64  `json:"value"`
+	Label string `json:"label"`
 }
 
 func CreatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gin.HandlerFunc {
@@ -40,6 +46,15 @@ func CreatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gi
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid data object"})
 			return
 		}
+		// exists, err := postRepo.ExistsByTopic(req.Topic, nil)
+		// if err != nil {
+		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// 	return
+		// }
+		// if exists {
+		// 	c.JSON(http.StatusConflict, gin.H{"error": "Topic đã tồn tại"})
+		// 	return
+		// }
 
 		// 2. Upload ảnh + lưu DB dùng helper
 		img, err := UploadAndSaveImage(c, "post")
@@ -80,7 +95,7 @@ func SearchPostsHandler(postRepo repository.PostRepo) gin.HandlerFunc {
 			return
 		}
 
-		result, err := postRepo.SearchPosts(req.Name, req.HotLevel, req.Page, req.PageSize)
+		result, err := postRepo.SearchPosts(req.Name, req.Topic, req.HotLevel, req.Page, req.PageSize)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -91,11 +106,19 @@ func SearchPostsHandler(postRepo repository.PostRepo) gin.HandlerFunc {
 }
 func UpdatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		postID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 
+		postID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 		dataStr := c.PostForm("data")
+		if dataStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data is required"})
+			return
+		}
+
 		var req PostRequest
-		_ = json.Unmarshal([]byte(dataStr), &req)
+		if err := json.Unmarshal([]byte(dataStr), &req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid data object"})
+			return
+		}
 
 		post, err := postRepo.GetByID(postID)
 		if err != nil || post == nil {
@@ -103,16 +126,28 @@ func UpdatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gi
 			return
 		}
 
+		// check trùng topic (chỉ khi đổi topic)
+		// if req.Topic != post.Topic {
+		// 	exists, err := postRepo.ExistsByTopic(req.Topic, &postID)
+		// 	if err != nil {
+		// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// 		return
+		// 	}
+		// 	if exists {
+		// 		c.JSON(http.StatusConflict, gin.H{"error": "Topic đã tồn tại"})
+		// 		return
+		// 	}
+		// }
+
+		// Upload ảnh mới (nếu có)
 		if _, err := c.FormFile("image"); err == nil {
 
-			// 1. Upload ảnh mới trước
 			newImg, err := UploadAndSaveImage(c, "post")
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			// 2. Xoá ảnh cũ (nếu có)
 			if post.ImageID.Valid {
 				oldImg, _ := imageRepo.GetByID(post.ImageID.Int64)
 				if oldImg != nil {
@@ -121,7 +156,6 @@ func UpdatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gi
 				}
 			}
 
-			// 3. Gán image mới
 			post.ImageID = sql.NullInt64{Int64: newImg.ID, Valid: true}
 		}
 
@@ -132,9 +166,31 @@ func UpdatePost(postRepo repository.PostRepo, imageRepo repository.ImageRepo) gi
 		post.HotLevel = req.HotLevel
 		post.UpdatedAt = time.Now()
 
-		_ = postRepo.UpdatePost(post)
+		err = postRepo.UpdatePost(post)
+		if err != nil {
+			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+				c.JSON(http.StatusConflict, gin.H{"error": "Topic đã tồn tại"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Cập nhật thành công"})
+	}
+}
+
+func GetPostOptionsHandler(postRepo repository.PostRepo) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		result, err := postRepo.GetPostOptions()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
 	}
 }
 

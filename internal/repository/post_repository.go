@@ -33,12 +33,17 @@ type PostSearchResponse struct {
 	HotAt       *time.Time `json:"hot_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
+type PostOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
 
 type PostRepo interface {
 	CreatePost(post *Post) (int64, error)
 
 	SearchPosts(
 		name string,
+		Topic string,
 		hotLevel *int8,
 		page, pageSize int,
 	) (*util.PaginatedResponse[PostSearchResponse], error)
@@ -46,6 +51,8 @@ type PostRepo interface {
 	GetByID(id int64) (*Post, error)
 	UpdatePost(post *Post) error
 	DeletePost(id int64) error
+	GetPostOptions() ([]PostOption, error)
+	// ExistsByTopic(topic string, excludeID *int64) (bool, error)
 }
 
 type postRepo struct {
@@ -95,6 +102,7 @@ func (r *postRepo) CreatePost(post *Post) (int64, error) {
 
 func (r *postRepo) SearchPosts(
 	name string,
+	topic string,
 	hotLevel *int8,
 	page, pageSize int,
 ) (*util.PaginatedResponse[PostSearchResponse], error) {
@@ -107,6 +115,10 @@ func (r *postRepo) SearchPosts(
 	if name != "" {
 		where += fmt.Sprintf(" AND p.name ILIKE $%d", len(args)+1)
 		args = append(args, "%"+name+"%")
+	}
+	if topic != "" {
+		where += fmt.Sprintf(" AND p.topic = $%d", len(args)+1)
+		args = append(args, topic)
 	}
 
 	if hotLevel != nil {
@@ -142,7 +154,7 @@ func (r *postRepo) SearchPosts(
 		WHERE %s
 	`, where)
 
-	return util.Paginate[PostSearchResponse](
+	return util.Paginate(
 		r.db,
 		query,
 		countQuery,
@@ -245,4 +257,57 @@ func (r *postRepo) DeletePost(id int64) error {
 	query := `DELETE FROM posts WHERE id = $1`
 	_, err := r.db.Exec(query, id)
 	return err
+}
+
+func (r *postRepo) GetPostOptions() ([]PostOption, error) {
+	query := `
+		SELECT DISTINCT topic
+		FROM posts
+		WHERE topic IS NOT NULL
+		ORDER BY topic ASC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []PostOption
+
+	for rows.Next() {
+		var topic string
+		if err := rows.Scan(&topic); err != nil {
+			return nil, err
+		}
+
+		result = append(result, PostOption{
+			Value: topic,
+			Label: topic,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *postRepo) ExistsByTopic(topic string, excludeID *int64) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM posts
+			WHERE topic = $1
+	`
+
+	args := []interface{}{topic}
+
+	if excludeID != nil {
+		query += " AND id != $2"
+		args = append(args, *excludeID)
+	}
+
+	query += ")"
+
+	var exists bool
+	err := r.db.QueryRow(query, args...).Scan(&exists)
+	return exists, err
 }
