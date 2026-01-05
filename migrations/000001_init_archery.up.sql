@@ -28,7 +28,7 @@ create table posts (
          on delete set null,
    name        varchar(255) not null,
    description varchar(255),
-   topic       varchar(100) not null unique,
+   topic       varchar(100) not null,
    prompt      text,
    hot_level   smallint default 0 check ( hot_level between 0 and 9 ),
    hot_at      timestamptz,
