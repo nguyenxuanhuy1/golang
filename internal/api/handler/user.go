@@ -75,7 +75,7 @@ func Login(c *gin.Context) {
 
 	user, err := userRepo.FindByUsername(req.Username)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Sai tài khoản hoặc mật khẩu"})
 		return
 	}
 
@@ -87,30 +87,26 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 2. Check password
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(user.Password),
 		[]byte(req.Password),
 	); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Sai tài khoản hoặc mật khẩu"})
 		return
 	}
 
-	// 3. Generate access token (15 phút)
 	accessToken, err := auth.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "generate access token failed"})
 		return
 	}
 
-	// 4. Generate refresh token (1 giờ)
 	refreshToken, err := auth.GenerateRefreshToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "generate refresh token failed"})
 		return
 	}
 
-	// 5. Response
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
@@ -118,7 +114,6 @@ func Login(c *gin.Context) {
 }
 
 func Profile(c *gin.Context) {
-	// 1. Lấy claims từ middleware
 	claimsAny, exists := c.Get(auth.ContextUserKey)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{

@@ -1,1 +1,3 @@
-drop table if exists users;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS images;
+DROP TABLE IF EXISTS users;
