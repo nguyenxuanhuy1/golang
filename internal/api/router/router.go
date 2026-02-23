@@ -6,13 +6,22 @@ import (
 	"traingolang/internal/config"
 	"traingolang/internal/repository"
 
-	// "traingolang/internal/websocket"
-
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+	r.SetTrustedProxies(nil)
+
+	// Cấu hình CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"https://hoctap.online"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	// r.MaxMultipartMemory = 1 << 20
 	postRepo := repository.NewPostRepo(config.DB)
 	imageRepo := repository.NewImageRepository(config.DB)
