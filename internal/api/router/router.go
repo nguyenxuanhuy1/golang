@@ -16,6 +16,9 @@ func SetupRouter() *gin.Engine {
 	// r.MaxMultipartMemory = 1 << 20
 	postRepo := repository.NewPostRepo(config.DB)
 	imageRepo := repository.NewImageRepository(config.DB)
+	cvOCRHandler := handler.NewCVOCRHandler()
+
+	r.POST("/api/cv/ocr", cvOCRHandler.UploadCV)
 	// PUBLIC ROUTES
 	r.POST("/api/user/register", handler.Register)
 	r.POST("/api/user/login", handler.Login)
